@@ -94,12 +94,12 @@
             
             modalContent.innerHTML = `
                 <div class="modal-header">
-                    <h5 class="modal-title">Carregando...</h5>
+                    <h5 class="modal-title">Loading...</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body text-center">
                     <div class="spinner-border text-primary" role="status"></div>
-                    <p class="mt-2">Carregando dados do utilizador...</p>
+                    <p class="mt-2">Loading user data...</p>
                 </div>
             `;
 
@@ -128,12 +128,12 @@
                 console.error('Error loading data:', error);
                 modalContent.innerHTML = `
                     <div class="modal-header">
-                        <h5 class="modal-title text-danger">Erro</h5>
+                        <h5 class="modal-title text-danger">Error</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-danger">
-                            Não foi possível carregar os dados do utilizador. Por favor, tente novamente.
+                            Unable to load user data. Please try again.
                         </div>
                     </div>
                 `;
