@@ -26,7 +26,7 @@
 
                         @can('manage-roles')
                         <a class="nav-link text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 py-3 px-4 rounded-b-lg transition duration-200 ease-in-out"
-                           href="#" data-section="roles" data-url="">
+                           href="#" data-section="roles" data-url="{{ route('Backoffice.partials.roles') }}">
                             Roles
                         </a>
                         @endcan
@@ -53,11 +53,29 @@
         </div>
     </div>
 </div>
-<!-- Modal Global para Edição -->
+
 <div class="modal fade" id="userEditModal" tabindex="-1" role="dialog" aria-labelledby="userEditModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content" id="userEditModalContent">
           
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteRoleModal" tabindex="-1" aria-labelledby="deleteRoleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteRoleModalLabel">Confirm Delete</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this role? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteRole">Delete</button>
+            </div>
         </div>
     </div>
 </div>
@@ -68,6 +86,229 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         userEditModal = new bootstrap.Modal(document.getElementById('userEditModal'));
+        const deleteRoleModal = new bootstrap.Modal(document.getElementById('deleteRoleModal'));
+        let deleteUrl = '';
+        let roleIdToDelete = null;
+
+        document.addEventListener('click', function(e) {
+            const editButton = e.target.closest('.edit-role-btn');
+            if (editButton) {
+                e.preventDefault();
+                const editUrl = editButton.dataset.editUrl;
+                
+                if (!editUrl) {
+                    console.error('Edit URL not found');
+                    return;
+                }
+
+                handleEditRole(editUrl);
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            const deleteButton = e.target.closest('.delete-role-btn');
+            if (deleteButton) {
+                e.preventDefault();
+                deleteUrl = deleteButton.dataset.deleteUrl;
+                roleIdToDelete = deleteButton.dataset.roleId;
+                deleteRoleModal.show();
+            }
+        });
+
+        async function handleEditRole(editUrl) {
+            const modalContent = document.getElementById('userEditModalContent');
+            
+            modalContent.innerHTML = `
+                <div class="modal-header">
+                    <h5 class="modal-title">Loading...</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Loading role data...</p>
+                </div>
+            `;
+
+            userEditModal.show();
+
+            try {
+                const response = await fetch(editUrl, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const html = await response.text();
+                modalContent.innerHTML = html;
+
+                const form = modalContent.querySelector('#editRoleForm');
+                if (form) {
+                    form.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        const submitBtn = form.querySelector('button[type="submit"]');
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+                        try {
+                            const formData = new FormData(form);
+                            const response = await fetch(form.action, {
+                                method: 'POST',
+                                body: formData,
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                }
+                            });
+
+                            const data = await response.json();
+                            console.log(data);
+                            
+                            if (data.success) {
+                                userEditModal.hide();
+                                
+                                const rolesLink = document.querySelector('.nav-link[data-section="roles"]');
+                                if (rolesLink && rolesLink.dataset.url) {
+                                    delete contentCache[rolesLink.dataset.url];
+                                    await loadContent(rolesLink.dataset.url, document.getElementById('admin-content-area'));
+
+                                    const contentArea = document.getElementById('admin-content-area');
+                                    const successAlert = document.createElement('div');
+                                    successAlert.className = 'alert alert-success alert-dismissible fade show';
+                                    successAlert.innerHTML = `
+                                        Role updated successfully!
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    `;
+                                    contentArea.insertBefore(successAlert, contentArea.firstChild);
+                                    
+                                    setTimeout(() => {
+                                        successAlert.remove();
+                                    }, 3000);
+                                }
+                            } else if (data.errors) {
+                                Object.keys(data.errors).forEach(field => {
+                                    const errorDiv = form.querySelector(`#${field}-error`);
+                                    if (errorDiv) {
+                                        errorDiv.textContent = data.errors[field][0];
+                                    }
+                                });
+                            }else{
+                                userEditModal.hide();
+                                const contentArea = document.getElementById('admin-content-area');
+                                    const successAlert = document.createElement('div');
+                                    successAlert.className = 'alert alert-danger alert-dismissible fade show';
+                                    successAlert.innerHTML = `
+                                        ${data.message}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    `;
+                                    contentArea.insertBefore(successAlert, contentArea.firstChild);
+                                    
+                                    setTimeout(() => {
+                                        successAlert.remove();
+                                    }, 5000);
+
+                            }
+                        } catch (error) {
+                           console.error('Error:', error);
+                            const alertDiv = document.createElement('div');
+                            alertDiv.className = 'alert alert-danger mt-3';
+                            alertDiv.textContent = 'Error saving changes. Please try again.';
+                            form.insertBefore(alertDiv, form.firstChild);
+                        } finally {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Save changes';
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading form:', error);
+                modalContent.innerHTML = `
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger">Error</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger">
+                            Unable to load the role data. Please try again.
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        document.getElementById('confirmDeleteRole').addEventListener('click', async function() {
+            if (!deleteUrl) return;
+
+            try {
+                const response = await fetch(deleteUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    deleteRoleModal.hide();
+                    
+                    const rolesLink = document.querySelector('.nav-link[data-section="roles"]');
+                    if (rolesLink && rolesLink.dataset.url) {
+                        delete contentCache[rolesLink.dataset.url];
+                        await loadContent(rolesLink.dataset.url, document.getElementById('admin-content-area'));
+                        
+                        const contentArea = document.getElementById('admin-content-area');
+                        const successAlert = document.createElement('div');
+                        successAlert.className = 'alert alert-success alert-dismissible fade show';
+                        successAlert.innerHTML = `
+                            Role deleted successfully!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        `;
+                        contentArea.insertBefore(successAlert, contentArea.firstChild);
+                        
+                        setTimeout(() => {
+                            successAlert.remove();
+                        }, 3000);
+                    }
+                } else {
+                    throw new Error(data.message || 'Error deleting role');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                const errorAlert = document.createElement('div');
+                errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+                errorAlert.innerHTML = `
+                    ${error.message || 'Error deleting role'}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.getElementById('admin-content-area').insertBefore(errorAlert, document.getElementById('admin-content-area').firstChild);
+                
+                setTimeout(() => {
+                    errorAlert.remove();
+                }, 3000);
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            const createButton = e.target.closest('.create-role-btn');
+            if (!createButton) return;
+
+            e.preventDefault();
+            const createUrl = createButton.dataset.createUrl;
+            
+            if (!createUrl) {
+                console.error('Create URL not found');
+                return;
+            }
+
+            handleCreateRole(createUrl);
+        });
 
         document.addEventListener('click', function(e) {
             const editButton = e.target.closest('.edit-user-btn');
@@ -353,6 +594,110 @@
         const initialLink = document.querySelector('.nav-link[data-section="overview"]');
         if (initialLink) {
             loadContent(initialLink.dataset.url, contentArea);
+        }
+
+        async function handleCreateRole(createUrl) {
+            const modalContent = document.getElementById('userEditModalContent');
+            
+            modalContent.innerHTML = `
+                <div class="modal-header">
+                    <h5 class="modal-title">Loading...</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Loading form...</p>
+                </div>
+            `;
+
+            userEditModal.show();
+
+            try {
+                const response = await fetch(createUrl, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const html = await response.text();
+                modalContent.innerHTML = html;
+
+                const form = modalContent.querySelector('#createRoleForm');
+                if (form) {
+                    form.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        const submitBtn = form.querySelector('button[type="submit"]');
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creating...';
+
+                        try {
+                            const formData = new FormData(form);
+                            const response = await fetch(form.action, {
+                                method: 'POST',
+                                body: formData,
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                }
+                            });
+
+                            const data = await response.json();
+
+                            if (response.ok) {
+                                userEditModal.hide();
+                               
+                                const rolesLink = document.querySelector('.nav-link[data-section="roles"]');
+                                if (rolesLink && rolesLink.dataset.url) {
+                                    delete contentCache[rolesLink.dataset.url];
+                                    await loadContent(rolesLink.dataset.url, document.getElementById('admin-content-area'));
+                                }
+
+                                const contentArea = document.getElementById('admin-content-area');
+                                const successAlert = document.createElement('div');
+                                successAlert.className = 'alert alert-success alert-dismissible fade show';
+                                successAlert.innerHTML = `
+                                    ${data.message || 'Role created successfully!'}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                `;
+                                contentArea.insertBefore(successAlert, contentArea.firstChild);
+                                
+                                setTimeout(() => {
+                                    successAlert.remove();
+                                }, 3000);
+                            } else if (data.errors) {
+                                Object.keys(data.errors).forEach(field => {
+                                    const errorDiv = form.querySelector(`#${field}-error`);
+                                    if (errorDiv) {
+                                        errorDiv.textContent = data.errors[field][0];
+                                    }
+                                });
+                            }
+                        } catch (error) {
+                            console.error('Error:', error);
+                        } finally {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Create Role';
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading form:', error);
+                modalContent.innerHTML = `
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger">Error</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger">
+                            Unable to load the form. Please try again.
+                        </div>
+                    </div>
+                `;
+            }
         }
     });
 </script>

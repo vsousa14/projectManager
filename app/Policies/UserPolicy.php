@@ -13,7 +13,7 @@ class UserPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasRole('CEO');
+        return $user->hasPermissionTo('View Users');
     }
 
     /**
@@ -21,7 +21,10 @@ class UserPolicy
      */
     public function view(User $user, User $model): bool
     {
-        return $user->hasRole('CEO') || $user->id === $model->id;
+        if ($user->id === $model->id) {
+            return true;
+        }
+        return $user->hasPermissionTo('View Users');
     }
 
     /**
@@ -29,7 +32,7 @@ class UserPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->hasPermissionTo('Create User');
     }
 
     /**
@@ -37,7 +40,15 @@ class UserPolicy
      */
     public function update(User $user, User $model): bool
     {
-         return ($user->hasRole('CEO') && $user->id !== $model->id) || $user->id === $model->id;
+        if ($user->id === $model->id) {
+            return true;
+        }
+
+        if ($model->hasRole('CEO') && !$user->hasRole('CEO')) {
+            return false;
+        }
+
+        return $user->hasPermissionTo('Update User');
     }
 
     /**
@@ -45,7 +56,15 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
-        return false;
+        if ($user->id === $model->id) {
+            return false;
+        }
+
+        if ($model->hasRole('CEO')) {
+            return false;
+        }
+
+        return $user->hasPermissionTo('Delete User');
     }
 
     /**
@@ -53,7 +72,7 @@ class UserPolicy
      */
     public function restore(User $user, User $model): bool
     {
-        return false;
+        return $user->hasPermissionTo('Update User');
     }
 
     /**
@@ -61,6 +80,6 @@ class UserPolicy
      */
     public function forceDelete(User $user, User $model): bool
     {
-        return false;
+        return $user->hasPermissionTo('Delete User');
     }
 }

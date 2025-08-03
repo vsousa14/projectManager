@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use App\Models\User; 
-use App\Services\UserService; 
+use App\Services\UserService;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 
 class BackofficeController extends Controller
 {
@@ -41,5 +43,4 @@ class BackofficeController extends Controller
 
         return view('Backoffice.partials.users', compact('users'));
     }
-
 }

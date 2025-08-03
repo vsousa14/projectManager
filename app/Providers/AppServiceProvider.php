@@ -5,12 +5,16 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Pagination\Paginator;
+use App\Models\User;
+use App\Policies\UserPolicy;
+use App\Policies\RolePolicy;
+use Spatie\Permission\Models\Role;
 
 class AppServiceProvider extends \Illuminate\Foundation\Support\Providers\AuthServiceProvider 
 {
-
-     protected $policies = [
+    protected $policies = [
         User::class => UserPolicy::class,
+        Role::class => RolePolicy::class,
     ];
 
     /**
